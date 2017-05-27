@@ -28,7 +28,7 @@ class TextFileReader(ImmutablePropertiesObject):
         if os.path.isfile(self.path):
             filenames = [os.path.abspath(self.path)]
         elif os.path.isdir(self.path):
-            filenames = glob.glob(os.path.join(self.data_dir, "*.txt"))
+            filenames = glob.glob(os.path.join(self.path, "*.txt"))
         else:
             raise ValueError("Path does not exist: {}".format(self.path))
 
@@ -81,6 +81,8 @@ class DataGenerator(ImmutablePropertiesObject):
             inp_data = batch[n_bef:-n_aft].clone()
             inp_lens = lens[n_bef:-n_aft].clone()
 
+            self.preprocessor.add_noise(inp_data, inp_lens)
+
             _offset = n_bef + n_aft + 1
             out_data = [batch[i:i + _offset].unsqueeze(0)
                         for i in range(self.batch_size)]
@@ -95,12 +97,10 @@ class DataGenerator(ImmutablePropertiesObject):
                 out_data = torch.cat(splits, 1)
                 out_lens = torch.cat(splits_lens, 1)
 
-            print(out_data.size(), out_lens.size())
             out_data = out_data.transpose(1, 0)
             out_lens = out_lens.transpose(1, 0)
 
             if self.pin_memory:
-                print(inp_data.size(), inp_lens.size())
                 inp_data, inp_lens = inp_data.pin_memory(), inp_lens.pin_memory()
                 out_data, out_lens = out_data.pin_memory(), out_lens.pin_memory()
 
