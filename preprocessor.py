@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 from .ipo import ImmutablePropertiesObject
@@ -15,33 +16,34 @@ class Preprocessor(ImmutablePropertiesObject):
             swap_prob=swap_prob
         )
 
-    def _add_noise(self, words):
-        words = words.copy()
+    def add_noise(self, batch, lens):
 
-        # Randomly swap words
-        num_swaps = round((len(words) - 1) * self.swap_prob)
-        swap_inds = np.random.permutation(len(words) - 1)[:num_swaps]
+        for sent, l in zip(batch, lens):
+            # Randomly swap words
+            swaps = np.random.choice(2, l - 3,
+                                     p=[self.swap_prob, 1 - self.swap_prob])
+            swap_inds = np.where(swaps == 0)[0]
 
-        for i in swap_inds:
-            words[i], words[i + 1] = words[i + 1], words[i]
+            for i in swap_inds:
+                sent[i + 1], sent[i + 2] = sent[i + 2], sent[i + 1]
 
-        # Randomly omit words
-        num_omits = round(len(words) * self.omit_prob)
-        omit_inds = np.random.permutation(len(words))[:num_omits]
+            # Randomly omit words
+            omits = np.random.choice(2, l - 2,
+                                     p=[self.omit_prob, 1 - self.omit_prob])
+            omit_inds = np.where(omits == 0)[0]
 
-        for i in omit_inds:
-            words[i] = self.unk_idx
+            for i in omit_inds:
+                sent[i + 1] = self.unk_idx
 
-        return words
-
-    def __call__(self, batch, noise=False):
+    def __call__(self, batch):
         batch = [[self.bos_idx] + [self.vocab[w] if w in self.vocab else self.unk_idx
                   for w in words] + [self.eos_idx] for words in batch]
 
-        if noise:
-            batch = [self._add_noise(words) for words in batch]
-
-        max_len = max(len(s) for s in batch)
+        lens = [len(s) for s in batch]
+        max_len = max(lens)
         batch = [s + [self.pad_idx] * (max_len - len(s)) for s in batch]
 
-        return batch
+        batch = torch.LongTensor(batch)
+        lens = torch.LongTensor(lens)
+
+        return batch, lens

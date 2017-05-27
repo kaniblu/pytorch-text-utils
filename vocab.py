@@ -1,6 +1,16 @@
-"""Vocabulary class."""
+"""Run this module independently as a script to prepare vocab for inference
+and training.
+"""
+
+import os
+import pickle
+from collections import Counter
+
+import tqdm
+import configargparse as argparse
 
 from .ipo import ImmutablePropertiesObject
+from .generator import TextFileReader
 
 
 class Vocabulary(ImmutablePropertiesObject):
@@ -87,3 +97,67 @@ class Vocabulary(ImmutablePropertiesObject):
 
     def __len__(self):
         return len(self._f2i)
+
+
+def create_parser():
+    parser = argparse.ArgParser()
+    parser.add_argument("--data_dir", type=str, required=True)
+    parser.add_argument("--vocab_path", type=str, required=True)
+    parser.add_argument("--eos", type=str, default="<EOS>")
+    parser.add_argument("--bos", type=str, default="<BOS>")
+    parser.add_argument("--pad", type=str, default="<PAD>")
+    parser.add_argument("--unk", type=str, default="<UNK>")
+    parser.add_argument("--cutoff", type=int, default=30000)
+
+    return parser
+
+
+def populate_vocab(sents, vocab, cutoff):
+    counter = Counter()
+
+    for sent in tqdm.tqdm(sents, desc="counting words"):
+        words = sent.strip().split()
+        counter.update(words)
+
+    topk = counter.most_common(cutoff)
+    words = set(w for w, c in topk)
+
+    for w in words:
+        vocab.add(w)
+
+    return vocab
+
+
+def main():
+    parser = create_parser()
+    args = parser.parse_args()
+
+    input_dir = args.data_dir
+    output_path = args.vocab_path
+    eos = args.eos
+    bos = args.bos
+    pad = args.pad
+    unk = args.unk
+    cutoff = args.cutoff
+
+    sents = TextFileReader(input_dir)
+    vocab = Vocabulary(pad=pad, eos=eos, bos=bos, unk=unk)
+
+    print("Populating vocabulary...")
+    vocab = populate_vocab(sents, vocab, cutoff)
+
+    parent_dir = os.path.dirname(output_path)
+
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, exist_ok=True)
+
+    print("Dumping vocabulary...")
+    with open(output_path, "wb") as f:
+        pickle.dump(vocab, f)
+
+    print("Vocabulary written to '{}'.".format(output_path))
+    print("Done!")
+
+
+if __name__ == '__main__':
+    main()

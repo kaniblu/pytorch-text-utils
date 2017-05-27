@@ -5,6 +5,11 @@ import visdom
 
 
 class Visdom(visdom.Visdom):
+    """A Wrapper for Visdom
+    
+    This wrapper reduces the communication overhead with the visdom server by 
+    pooling requests."""
+
     def __init__(self, *args, buffer_size=10, env=None, **kwargs):
         super(Visdom, self).__init__(*args, **kwargs)
 
