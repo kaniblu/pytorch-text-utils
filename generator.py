@@ -104,8 +104,8 @@ class DataGenerator(ImmutablePropertiesObject):
                     if n_bef and n_aft:
                         splits = out_data[:n_bef], out_data[-n_aft:]
                         splits_lens = out_lens[:n_bef], out_lens[-n_aft:]
-                        out_data = torch.cat(splits, 1)
-                        out_lens = torch.cat(splits_lens, 1)
+                        out_data = torch.cat(splits, 0)
+                        out_lens = torch.cat(splits_lens, 0)
                     elif n_bef:
                         out_data = out_data[:n_bef]
                         out_lens = out_lens[:n_bef]
