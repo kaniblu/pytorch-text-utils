@@ -1,42 +1,44 @@
 import torch
 import numpy as np
 
-from .ipo import ImmutablePropertiesObject
 
+class Preprocessor(object):
+    def __init__(self, vocab, omit_prob=0.0, swap_prob=0.0):
+        self.vocab = vocab
+        self.unk_idx = vocab[vocab.unk]
+        self.pad_idx = vocab[vocab.pad]
+        self.bos_idx = vocab[vocab.bos]
+        self.eos_idx = vocab[vocab.eos]
+        self.omit_prob = omit_prob
+        self.swap_prob = swap_prob
 
-class Preprocessor(ImmutablePropertiesObject):
-    def __init__(self, vocab, omit_prob=0, swap_prob=0):
-        super(Preprocessor, self).__init__(
-            vocab=vocab,
-            unk_idx=vocab[vocab.unk],
-            pad_idx=vocab[vocab.pad],
-            bos_idx=vocab[vocab.bos],
-            eos_idx=vocab[vocab.eos],
-            omit_prob=omit_prob,
-            swap_prob=swap_prob
-        )
+    def _random_idx(self, l, prob):
+        n = round(l * prob)
+        idx = np.random.permutation(l)[:n]
+
+        return idx
 
     def add_noise(self, batch, lens):
 
         for sent, l in zip(batch, lens):
             # Randomly swap words
-            swaps = np.random.choice(2, l - 3,
-                                     p=[self.swap_prob, 1 - self.swap_prob])
-            swap_inds = np.where(swaps == 0)[0]
 
-            for i in swap_inds:
-                sent[i + 1], sent[i + 2] = sent[i + 2], sent[i + 1]
+            if self.swap_prob > 0.0:
+                swap_inds = self._random_idx(l - 3, self.swap_prob)
+
+                for i in swap_inds:
+                    sent[i + 1], sent[i + 2] = sent[i + 2], sent[i + 1]
 
             # Randomly omit words
-            omits = np.random.choice(2, l - 2,
-                                     p=[self.omit_prob, 1 - self.omit_prob])
-            omit_inds = np.where(omits == 0)[0]
+            if self.omit_prob > 0.0:
+                omit_inds = self._random_idx(l - 2, self.omit_prob)
 
-            for i in omit_inds:
-                sent[i + 1] = self.unk_idx
+                for i in omit_inds:
+                    sent[i + 1] = self.unk_idx
 
     def __call__(self, batch):
-        batch = [[self.bos_idx] + [self.vocab[w] if w in self.vocab else self.unk_idx
+        batch = [[self.bos_idx] + [self.vocab.f2i[w]
+                                   if w in self.vocab.f2i else self.unk_idx
                   for w in words] + [self.eos_idx] for words in batch]
 
         lens = [len(s) for s in batch]

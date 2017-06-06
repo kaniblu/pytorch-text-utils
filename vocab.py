@@ -13,49 +13,48 @@ from .ipo import ImmutablePropertiesObject
 from .generator import TextFileReader
 
 
-class Vocabulary(ImmutablePropertiesObject):
+class Vocabulary(object):
     def __init__(self, **reserved):
-        self._words = []
-        self._f2i = {}
-        self._i2f = {}
-        self._reserved = reserved
-
-        super(Vocabulary, self).__init__(**reserved)
+        self.words = []
+        self.f2i = {}
+        self.i2f = {}
+        self.reserved = reserved
 
         for word, token in reserved.items():
             self.add(token)
+            setattr(self, word, token)
 
     def add(self, w, ignore_duplicates=True):
-        if w in self._f2i:
+        if w in self.f2i:
             if not ignore_duplicates:
                 raise ValueError("'{}' already exists "
                                  "in the vocab.".format(w))
-            return self._f2i[w]
+            return self.f2i[w]
 
-        index = len(self._words)
-        self._words.append(w)
+        index = len(self.words)
+        self.words.append(w)
 
-        self._f2i[w] = index
-        self._i2f[index] = w
+        self.f2i[w] = index
+        self.i2f[index] = w
 
-        return self._f2i[w]
+        return self.f2i[w]
 
     def remove(self, w):
         """
         Removes a word from the vocab. The indices are unchanged.
         """
-        if w not in self._f2i:
+        if w not in self.f2i:
             raise ValueError("'{}' does not exist.".format(w))
 
         if w in self.reserved:
             raise ValueError("'{}' is one of the reserved words, and thus"
                              "cannot be removed.".format(w))
 
-        index = self._f2i[w]
-        del self._f2i[w]
-        del self._i2f[index]
+        index = self.f2i[w]
+        del self.f2i[w]
+        del self.i2f[index]
 
-        self._words.remove(w)
+        self.words.remove(w)
 
     def reconstruct_indices(self):
         """
@@ -63,40 +62,28 @@ class Vocabulary(ImmutablePropertiesObject):
         Vocabulary does not handle empty indices when words are removed,
           hence it need to be told explicity about when to reconstruct them.
         """
-        del self._i2f, self._f2i
-        self._f2i, self._i2f = {}, {}
+        del self.i2f, self.f2i
+        self.f2i, self.i2f = {}, {}
 
-        for i, w in enumerate(self._words):
-            self._f2i[w] = i
-            self._i2f[i] = w
-
-    @property
-    def words(self):
-        return self._words
-
-    @property
-    def unk_tok(self):
-        return self._unk_tok
-
-    @property
-    def reserved(self):
-        return self._reserved
+        for i, w in enumerate(self.words):
+            self.f2i[w] = i
+            self.i2f[i] = w
 
     def __getitem__(self, item):
         if isinstance(item, int):
-            return self._i2f[item]
+            return self.i2f[item]
         elif isinstance(item, str):
-            return self._f2i[item]
+            return self.f2i[item]
         elif hasattr(item, "__iter__"):
             return [self[ele] for ele in item]
         else:
             raise ValueError("Unknown type: {}".format(type(item)))
 
     def __contains__(self, item):
-        return item in self._f2i or item in self._i2f
+        return item in self.f2i or item in self.i2f
 
     def __len__(self):
-        return len(self._f2i)
+        return len(self.f2i)
 
 
 def create_parser():
@@ -112,12 +99,11 @@ def create_parser():
     return parser
 
 
-def populate_vocab(sents, vocab, cutoff):
+def populate_vocab(words, vocab, cutoff):
     counter = Counter()
 
-    for sent in tqdm.tqdm(sents, desc="counting words"):
-        words = sent.strip().split()
-        counter.update(words)
+    for word in tqdm.tqdm(words, desc="counting words"):
+        counter.update([word])
 
     topk = counter.most_common(cutoff)
     words = set(w for w, c in topk)
@@ -126,6 +112,17 @@ def populate_vocab(sents, vocab, cutoff):
         vocab.add(w)
 
     return vocab
+
+
+def iterate_words(input_dir):
+    reader = TextFileReader(input_dir)
+
+    for line in reader:
+        sents = line.split("\t")
+
+        for sent in sents:
+            for word in sent.split():
+                yield word
 
 
 def main():
@@ -140,11 +137,11 @@ def main():
     unk = args.unk
     cutoff = args.cutoff
 
-    sents = TextFileReader(input_dir)
+    words = iterate_words(input_dir)
     vocab = Vocabulary(pad=pad, eos=eos, bos=bos, unk=unk)
 
     print("Populating vocabulary...")
-    vocab = populate_vocab(sents, vocab, cutoff)
+    vocab = populate_vocab(words, vocab, cutoff)
 
     parent_dir = os.path.dirname(output_path)
 

@@ -14,12 +14,10 @@ import torch.utils.data as D
 from .ipo import ImmutablePropertiesObject
 
 
-class TextFileReader(ImmutablePropertiesObject):
+class TextFileReader(object):
     def __init__(self, path, shuffle_files=False):
-        super(TextFileReader, self).__init__(
-            path=path,
-            shuffle=shuffle_files,
-        )
+        self.path = path
+        self.shuffle = shuffle_files
 
     def __iter__(self):
         return self.generate()
@@ -41,24 +39,123 @@ class TextFileReader(ImmutablePropertiesObject):
                     yield line.strip()
 
 
-class DataGenerator(ImmutablePropertiesObject):
-    def __init__(self, datagen, vocab, batch_size, max_length, preprocessor,
+class SentenceTargetGenerator(object):
+    def __init__(self, sents, max_length):
+        self.sents = sents
+        self.max_length = max_length
+
+    def __iter__(self):
+        return self.generate()
+
+    def generate(self):
+        for line in self.sents:
+
+            if "\t" in line:
+                sent, target = line.split("\t")
+                sent, target = sent.split(), target.split()
+            else:
+                line = line.split()
+                sent, target = line, line
+
+            if len(sent) > self.max_length or len(target) > self.max_length:
+                continue
+
+            yield sent, target
+
+
+def create_data_loader(sent_targets, batch_size, preprocessor,
+                       shuffle=False, pin_memory=True, add_input_noise=True):
+    def _collate_fn(batch):
+        sents, targets = zip(*batch)
+        sents, sents_lens = preprocessor(sents)
+        targets, targets_lens = preprocessor(targets)
+
+        if add_input_noise:
+            preprocessor.add_noise(sents, sents_lens)
+
+        return sents, sents_lens, targets, targets_lens
+
+    data_loader = D.DataLoader(sent_targets, batch_size, shuffle, num_workers=2,
+                               collate_fn=_collate_fn, pin_memory=pin_memory)
+
+    return data_loader
+
+
+class _AutoencodingDataGenerator(object):
+    """Sentence Data Generator
+    
+    Generates pairs sentences and their target predictions. The input data is
+    an iterator over either (1) individual sentences or (2) a pair of sentence
+    and its target sentence separated by a tab character. These can be mixed.
+    The sentences must be a string of words separated by spaces.
+    """
+
+    def __init__(self, sents, vocab, batch_size, max_length, preprocessor,
+                 pin_memory=True, add_input_noise=True):
+        self.sents = sents
+        self.vocab = vocab
+        self.batch_size = batch_size
+        self.max_length = max_length
+        self.preprocessor = preprocessor
+        self.pin_memory = pin_memory
+        self.add_input_noise = add_input_noise
+
+    def __iter__(self):
+        return self.generate()
+
+    def generate(self):
+        batch = []
+
+        for line in self.sents:
+
+            if "\t" in line:
+                sent, target = line.split("\t")
+                sent, target = sent.split(), target.split()
+            else:
+                line = line.split()
+                sent, target = line, line
+
+            if len(sent) > self.max_length or len(target) > self.max_length:
+                continue
+
+            batch.append((sent, target))
+
+            if len(batch) < self.batch_size:
+                continue
+
+            batch_sents, batch_targets = zip(*batch)
+            batch_sents, sents_lens = self.preprocessor(batch_sents)
+            batch_targets, targets_lens = self.preprocessor(batch_targets)
+
+            if self.add_input_noise:
+                self.preprocessor.add_noise(batch_sents, sents_lens)
+
+            if self.pin_memory:
+                batch_sents, sents_lens = batch_sents.pin_memory(), sents_lens.pin_memory()
+                batch_targets, targets_lens = batch_targets.pin_memory(), targets_lens.pin_memory()
+
+            yield batch_sents, sents_lens, batch_targets, targets_lens
+
+            del batch
+            batch = []
+
+
+class ContextDataGenerator(object):
+    def __init__(self, sents, vocab, batch_size, max_length, preprocessor,
                  n_before=0, n_after=0, predict_self=True, pin_memory=True,
                  add_input_noise=True):
         assert n_before or n_after or predict_self
 
-        super(DataGenerator, self).__init__(
-            datagen=datagen,
-            batch_size=batch_size,
-            max_length=max_length,
-            vocab=vocab,
-            preprocessor=preprocessor,
-            n_before=n_before,
-            n_after=n_after,
-            predict_self=predict_self,
-            pin_memory=pin_memory,
-            add_input_noise=add_input_noise
-        )
+        self.sents = sents
+        self.batch_size = batch_size
+        self.max_length = max_length
+        self.vocab = vocab
+        self.preprocessor = preprocessor
+        self.n_before = n_before
+        self.n_after = n_after
+        self.predict_self = predict_self
+        self.pin_memory = pin_memory
+        self.add_input_noise = add_input_noise
 
     def __iter__(self):
         return self.generate()
@@ -68,7 +165,7 @@ class DataGenerator(ImmutablePropertiesObject):
         batch = []
         f_batch_size = self.batch_size + self.n_before + self.n_after
 
-        for line in self.datagen:
+        for line in self.sents:
             words = line.split()
 
             if len(words) > self.max_length:
