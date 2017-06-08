@@ -50,6 +50,26 @@ class SentenceTargetGenerator(object):
     def generate(self):
         for line in self.sents:
 
+            sent, target = line.split("\t")
+            sent, target = sent.split(), target.split()
+
+            if len(sent) > self.max_length or len(target) > self.max_length:
+                continue
+
+            yield sent, target
+
+
+class SentenceTargetLabelGenerator(object):
+    def __init__(self, sents, max_length):
+        self.sents = sents
+        self.max_length = max_length
+
+    def __iter__(self):
+        return self.generate()
+
+    def generate(self):
+        for line in self.sents:
+
             sent, target, label = line.split("\t")
             sent, target = sent.split(), target.split()
 
@@ -59,7 +79,7 @@ class SentenceTargetGenerator(object):
             yield sent, target, int(label)
 
 
-def create_data_loader(sent_targets, batch_size, preprocessor,
+def create_data_loader_label(sent_targets, batch_size, preprocessor,
                        shuffle=False, pin_memory=True, add_input_noise=True):
     def _collate_fn(batch):
         sents, targets, labels = zip(*batch)
@@ -77,8 +97,24 @@ def create_data_loader(sent_targets, batch_size, preprocessor,
 
     return data_loader
 
+def create_data_loader(sent_targets, batch_size, preprocessor,
+                       shuffle=False, pin_memory=True, add_input_noise=True):
+    def _collate_fn(batch):
+        sents, targets = zip(*batch)
+        sents, sents_lens = preprocessor(sents)
+        targets, targets_lens = preprocessor(targets)
 
-class _AutoencodingDataGenerator(object):
+        if add_input_noise:
+            preprocessor.add_noise(sents, sents_lens)
+
+        return sents, sents_lens, targets, targets_lens
+
+    data_loader = D.DataLoader(sent_targets, batch_size, shuffle, num_workers=2,
+                               collate_fn=_collate_fn, pin_memory=pin_memory)
+
+    return data_loader
+
+class AutoencodingDataGenerator(object):
     """Sentence Data Generator
     
     Generates pairs sentences and their target predictions. The input data is
