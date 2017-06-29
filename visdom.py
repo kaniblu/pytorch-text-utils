@@ -10,11 +10,11 @@ class Visdom(visdom.Visdom):
     This wrapper reduces the communication overhead with the visdom server by 
     pooling requests."""
 
-    def __init__(self, *args, buffer_size=10, env=None, **kwargs):
+    def __init__(self, *args, buffer_size=10, env=None, name=None, **kwargs):
         super(Visdom, self).__init__(*args, **kwargs)
-
         self.buffer_size = buffer_size
         self.env = env
+        self.name = name
         self.wincache = {}
         self.buffer = {}
 
@@ -28,7 +28,10 @@ class Visdom(visdom.Visdom):
                 win = self.wincache[title]
                 kwargs["win"] = win
         else:
-            title = None
+            title = ""
+
+        if has_title and self.name is not None:
+            kwargs["opts"]["title"] = "[{}] ".format(self.name) + title
 
         if "env" not in kwargs:
             kwargs["env"] = self.env

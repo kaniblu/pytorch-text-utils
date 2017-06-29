@@ -7,11 +7,8 @@ import io
 import glob
 import random
 
-import numpy as np
 import torch
 import torch.utils.data as D
-
-from .ipo import ImmutablePropertiesObject
 
 
 class TextFileReader(object):
@@ -80,7 +77,8 @@ class SentenceTargetLabelGenerator(object):
 
 
 def create_data_loader_label(sent_targets, batch_size, preprocessor,
-                       shuffle=False, pin_memory=True, add_input_noise=True):
+                             shuffle=False, pin_memory=True,
+                             add_input_noise=True):
     def _collate_fn(batch):
         sents, targets, labels = zip(*batch)
         sents, sents_lens = preprocessor(sents)
@@ -96,6 +94,7 @@ def create_data_loader_label(sent_targets, batch_size, preprocessor,
                                collate_fn=_collate_fn, pin_memory=pin_memory)
 
     return data_loader
+
 
 def create_data_loader(sent_targets, batch_size, preprocessor,
                        shuffle=False, pin_memory=True, add_input_noise=True):
@@ -113,6 +112,7 @@ def create_data_loader(sent_targets, batch_size, preprocessor,
                                collate_fn=_collate_fn, pin_memory=pin_memory)
 
     return data_loader
+
 
 class AutoencodingDataGenerator(object):
     """Sentence Data Generator
@@ -244,7 +244,10 @@ class ContextDataGenerator(object):
                         out_lens = out_lens[-n_aft:]
             else:
                 out_data = batch.unsqueeze(0)
-                out_lens = batch.unsqueeze(0)
+                out_lens = lens.unsqueeze(0)
+
+            inp_data, inp_lens = inp_data.contiguous(), inp_lens.contiguous()
+            out_data, out_lens = out_data.contiguous(), out_lens.contiguous()
 
             if self.pin_memory:
                 inp_data, inp_lens = inp_data.pin_memory(), inp_lens.pin_memory()

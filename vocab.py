@@ -9,7 +9,6 @@ from collections import Counter
 import tqdm
 import configargparse as argparse
 
-from .ipo import ImmutablePropertiesObject
 from .generator import TextFileReader
 
 
