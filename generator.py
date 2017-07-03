@@ -124,7 +124,7 @@ class AutoencodingDataGenerator(object):
     """
 
     def __init__(self, sents, vocab, batch_size, max_length, preprocessor,
-                 pin_memory=True, add_input_noise=True):
+                 pin_memory=True, add_input_noise=True, allow_residual=True):
         self.sents = sents
         self.vocab = vocab
         self.batch_size = batch_size
@@ -132,6 +132,7 @@ class AutoencodingDataGenerator(object):
         self.preprocessor = preprocessor
         self.pin_memory = pin_memory
         self.add_input_noise = add_input_noise
+        self.allow_residual = allow_residual
 
     def __iter__(self):
         return self.generate()
@@ -171,6 +172,20 @@ class AutoencodingDataGenerator(object):
 
             del batch
             batch = []
+
+        if self.allow_residual and batch:
+            batch_sents, batch_targets = zip(*batch)
+            batch_sents, sents_lens = self.preprocessor(batch_sents)
+            batch_targets, targets_lens = self.preprocessor(batch_targets)
+
+            if self.add_input_noise:
+                self.preprocessor.add_noise(batch_sents, sents_lens)
+
+            if self.pin_memory:
+                batch_sents, sents_lens = batch_sents.pin_memory(), sents_lens.pin_memory()
+                batch_targets, targets_lens = batch_targets.pin_memory(), targets_lens.pin_memory()
+
+            yield batch_sents, sents_lens, batch_targets, targets_lens
 
 
 class ContextDataGenerator(object):
