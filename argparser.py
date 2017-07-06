@@ -86,9 +86,21 @@ class ArgParser(configargparse.ArgParser):
             dest = action.dest
             arg_val = getattr(args, dest, None)
 
-            if arg_val is not None and not os.path.isabs(arg_val):
-                new_val = os.path.join(base_path, arg_val)
-                setattr(args, dest, new_val)
+            if arg_val is None:
+                continue
+
+            def _resolve(path):
+                if not os.path.isabs(path):
+                    return os.path.join(base_path, path)
+
+                return path
+
+            if isinstance(arg_val, list):
+                new_val = [_resolve(v) for v in arg_val]
+            else:
+                new_val = _resolve(arg_val)
+
+            setattr(args, dest, new_val)
 
     def parse_args(self, *parsed_args, **kwargs):
         parsed_args = super(ArgParser, self).parse_args(*parsed_args, **kwargs)
