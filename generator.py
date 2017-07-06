@@ -114,6 +114,60 @@ def create_data_loader(sent_targets, batch_size, preprocessor,
     return data_loader
 
 
+class SentenceGenerator(object):
+    """Simple Sentence Data Generator
+    
+    Generates sentences preprocessed by batches.
+    """
+
+    def __init__(self, sents, vocab, batch_size, max_length, preprocessor,
+                 pin_memory=True, allow_residual=True):
+        self.sents = sents
+        self.vocab = vocab
+        self.batch_size = batch_size
+        self.max_length = max_length
+        self.preprocessor = preprocessor
+        self.pin_memory = pin_memory
+        self.allow_residual = allow_residual
+
+    def __iter__(self):
+        return self.generate()
+
+    def generate(self):
+        batch = []
+
+        for line in self.sents:
+            sent = line.split()
+
+            if len(sent) > self.max_length:
+                continue
+
+            batch.append(sent)
+
+            if len(batch) < self.batch_size:
+                continue
+
+            batch_sents, sents_lens = self.preprocessor(batch)
+
+            if self.pin_memory:
+                batch_sents, sents_lens = \
+                    batch_sents.pin_memory(), sents_lens.pin_memory()
+
+            yield batch_sents, sents_lens
+
+            del batch
+            batch = []
+
+        if self.allow_residual and batch:
+            batch_sents, sents_lens = self.preprocessor(batch)
+
+            if self.pin_memory:
+                batch_sents, sents_lens = \
+                    batch_sents.pin_memory(), sents_lens.pin_memory()
+
+            yield batch_sents, sents_lens
+
+
 class AutoencodingDataGenerator(object):
     """Sentence Data Generator
     
