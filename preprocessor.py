@@ -3,7 +3,8 @@ import numpy as np
 
 
 class Preprocessor(object):
-    def __init__(self, vocab, omit_prob=0.0, swap_prob=0.0):
+    def __init__(self, vocab, omit_prob=0.0, swap_prob=0.0,
+                 add_bos=True, add_eos=True):
         self.vocab = vocab
         self.unk_idx = vocab[vocab.unk]
         self.pad_idx = vocab[vocab.pad]
@@ -11,6 +12,8 @@ class Preprocessor(object):
         self.eos_idx = vocab[vocab.eos]
         self.omit_prob = omit_prob
         self.swap_prob = swap_prob
+        self.add_bos = add_bos
+        self.add_eos = add_eos
 
     def _random_idx(self, l, prob):
         n = round(l * prob)
@@ -37,9 +40,15 @@ class Preprocessor(object):
                     sent[i + 1] = self.unk_idx
 
     def __call__(self, batch):
-        batch = [[self.bos_idx] + [self.vocab.f2i[w]
+        batch = [[self.vocab.f2i[w]
                                    if w in self.vocab.f2i else self.unk_idx
-                  for w in words] + [self.eos_idx] for words in batch]
+                  for w in words] for words in batch]
+
+        if self.add_bos:
+            batch = [[self.bos_idx] + words for words in batch]
+
+        if self.add_eos:
+            batch = [words + [self.eos_idx] for words in batch]
 
         lens = [len(s) for s in batch]
         max_len = max(lens)
