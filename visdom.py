@@ -55,6 +55,37 @@ class Visdom(visdom.Visdom):
     def scatter(self, *args, **kwargs):
         return self._process(super(Visdom, self).scatter, *args, **kwargs)
 
+    def _flush(self, title, opts=dict()):
+        env = self.env
+        X = np.array(self.buffer[title]["X"])
+        Y = np.array(self.buffer[title]["Y"])
+
+        if title not in self.wincache:
+            opts["title"] = title
+
+            self.wincache[title] = self.line(
+                X=X,
+                Y=Y,
+                env=env,
+                opts=opts
+            )
+        else:
+            self.line(
+                X=X,
+                Y=Y,
+                env=env,
+                win=self.wincache[title],
+                update="append"
+            )
+
+        del self.buffer[title]
+
+    def flush(self):
+        titles = list(self.buffer.keys())
+        for title in titles:
+            if self.buffer[title]["X"]:
+                self._flush(title)
+
     def plot(self, X, Y, opts=dict()):
         title = opts.get("title")
 
@@ -67,25 +98,4 @@ class Visdom(visdom.Visdom):
         self.buffer[title]["Y"].extend(Y)
 
         if len(self.buffer[title]["X"]) > self.buffer_size:
-            X = np.array(self.buffer[title]["X"])
-            Y = np.array(self.buffer[title]["Y"])
-
-            if title not in self.wincache:
-                opts["title"] = title
-
-                self.wincache[title] = self.line(
-                    X=X,
-                    Y=Y,
-                    env=env,
-                    opts=opts
-                )
-            else:
-                self.line(
-                    X=X,
-                    Y=Y,
-                    env=env,
-                    win=self.wincache[title],
-                    update="append"
-                )
-
-            del self.buffer[title]
+            self._flush(title, opts)
