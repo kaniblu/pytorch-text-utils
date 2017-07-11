@@ -86,16 +86,14 @@ class Visdom(visdom.Visdom):
             if self.buffer[title]["X"]:
                 self._flush(title)
 
-    def plot(self, X, Y, opts=dict()):
+    def plot(self, X, Y, opts=dict(), flush=False):
         title = opts.get("title")
 
         if title not in self.buffer:
             self.buffer[title] = {"X": [], "Y": []}
 
-        env = self.env
-
         self.buffer[title]["X"].extend(X)
         self.buffer[title]["Y"].extend(Y)
 
-        if len(self.buffer[title]["X"]) > self.buffer_size:
+        if flush or len(self.buffer[title]["X"]) > self.buffer_size:
             self._flush(title, opts)
