@@ -6,10 +6,11 @@ import os
 import pickle
 from collections import Counter
 
-import tqdm
 import configargparse as argparse
+import tqdm
 
-from .generator import TextFileReader
+from .iterator import DirectoryReader
+from .iterator import SplitWordIterator
 
 
 class Vocabulary(object):
@@ -113,17 +114,6 @@ def populate_vocab(words, vocab, cutoff):
     return vocab
 
 
-def iterate_words(input_dir):
-    reader = TextFileReader(input_dir)
-
-    for line in reader:
-        sents = line.split("\t")
-
-        for sent in sents:
-            for word in sent.split():
-                yield word
-
-
 def main():
     parser = create_parser()
     args = parser.parse_args()
@@ -136,7 +126,8 @@ def main():
     unk = args.unk
     cutoff = args.cutoff
 
-    words = iterate_words(input_dir)
+    reader = DirectoryReader(input_dir)
+    words = SplitWordIterator(reader)
     vocab = Vocabulary(pad=pad, eos=eos, bos=bos, unk=unk)
 
     print("Populating vocabulary...")
