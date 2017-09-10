@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-__VERSION__ = "0.1"
+__VERSION__ = "0.1.2"
 
 setup(
     name="pytorch-text-utils",
@@ -17,6 +17,14 @@ setup(
         "Programming Language :: Python :: 3"
     ],
     keywords="pytorch text nlp utility",
-    packages=["torchtextutils"],
-    install_requires=["tqdm"]
+    packages=[
+        "torchtextutils",
+        "torchtextutils.data",
+        "torchtextutils.data.preprocessor",
+        "torchtextutils.iterator"
+    ],
+    install_requires=[
+        "pyaap",
+        "tqdm"
+    ]
 )

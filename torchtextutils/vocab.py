@@ -6,7 +6,7 @@ import os
 import pickle
 from collections import Counter
 
-import configargparse as argparse
+import yaap as argparse
 import tqdm
 
 from .iterator import DirectoryReader
