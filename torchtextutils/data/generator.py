@@ -173,7 +173,7 @@ def create_generator_ae(sents, batch_size, preprocessor,
     return ret
 
 
-def create_generator_st(sents, batch_size, preprocessor,
+def create_generator_st(sents, batch_size, preprocessor, batch_first=True,
                         pin_memory=True, allow_residual=True, max_length=None,
                         n_before=1, n_after=1, predict_self=False,
                         word_iterator=SplitWordIterator):
@@ -182,7 +182,10 @@ def create_generator_st(sents, batch_size, preprocessor,
     batches = BatchGenerator(sent_tokens, batch_size,
                              allow_residual=allow_residual)
     prep_batches = FunctionMapper(batches, preprocessor)
-    context_data = ContextDataGenerator(prep_batches, n_before, n_after,
+    context_data = ContextDataGenerator(prep_batches,
+                                        batch_first=batch_first,
+                                        n_before=n_before,
+                                        n_after=n_after,
                                         predict_self=predict_self)
 
     if pin_memory:
