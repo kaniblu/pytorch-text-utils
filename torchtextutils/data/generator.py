@@ -95,15 +95,18 @@ class ContextDataGenerator(common.Generator):
     provide the number of before and after contexts in addition to the intended
     batch size.
     """
-    def __init__(self, prep_batches,
+    def __init__(self, prep_batches, batch_first=True,
                  n_before=1, n_after=1, predict_self=False):
         self.n_before = n_before
         self.n_after = n_after
         self.predict_self = predict_self
         self.prep_batches = prep_batches
+        self.batch_first = batch_first
 
     def generate(self):
         n_bef, n_aft = self.n_before, self.n_after
+        batch_dim = 0 if self.batch_first else 1
+        context_dim = 1 if self.batch_first else 0
 
         for batch, lens in self.prep_batches:
             batch_size = len(lens)
@@ -114,28 +117,38 @@ class ContextDataGenerator(common.Generator):
             if n_bef or n_aft:
                 _offset = n_bef + n_aft + 1
                 subbatch_size = batch_size - n_bef - n_aft
-                out_data = [batch[i:i + _offset].unsqueeze(1)
+                out_data = [batch[i:i + _offset].unsqueeze(batch_dim)
                             for i in range(subbatch_size)]
-                out_lens = [lens[i:i + _offset].unsqueeze(1)
+                out_lens = [lens[i:i + _offset].unsqueeze(batch_dim)
                             for i in range(subbatch_size)]
-                out_data = torch.cat(out_data, 1)
-                out_lens = torch.cat(out_lens, 1)
+                out_data = torch.cat(out_data, batch_dim)
+                out_lens = torch.cat(out_lens, batch_dim)
 
                 if not self.predict_self:
                     if n_bef and n_aft:
-                        splits = out_data[:n_bef], out_data[-n_aft:]
-                        splits_lens = out_lens[:n_bef], out_lens[-n_aft:]
-                        out_data = torch.cat(splits, 0)
-                        out_lens = torch.cat(splits_lens, 0)
+                        splits = out_data.narrow(context_dim, 0, n_bef), \
+                                 out_data.narrow(context_dim,
+                                                 _offset - n_aft,
+                                                 n_aft)
+                        splits_lens = out_lens.narrow(context_dim, 0, n_bef),\
+                                      out_lens.narrow(context_dim,
+                                                      _offset - n_aft,
+                                                      n_aft)
+                        out_data = torch.cat(splits, context_dim)
+                        out_lens = torch.cat(splits_lens, context_dim)
                     elif n_bef:
-                        out_data = out_data[:n_bef]
-                        out_lens = out_lens[:n_bef]
+                        out_data = out_data.narrow(context_dim, 0, n_bef)
+                        out_lens = out_lens.narrow(context_dim, 0, n_bef)
                     elif n_aft:
-                        out_data = out_data[-n_aft:]
-                        out_lens = out_lens[-n_aft:]
+                        out_data = out_data.narrow(context_dim,
+                                                   _offset - n_aft,
+                                                   n_aft)
+                        out_lens = out_lens.narrow(context_dim,
+                                                   _offset - n_aft,
+                                                   n_aft)
             else:
-                out_data = batch.unsqueeze(0)
-                out_lens = lens.unsqueeze(0)
+                out_data = batch.unsqueeze(context_dim)
+                out_lens = lens.unsqueeze(context_dim)
 
             inp_data, inp_lens = inp_data.contiguous(), inp_lens.contiguous()
             out_data, out_lens = out_data.contiguous(), out_lens.contiguous()
