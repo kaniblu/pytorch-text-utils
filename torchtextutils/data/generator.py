@@ -89,6 +89,12 @@ class MemoryPinner(FunctionMapper):
 
 
 class ContextDataGenerator(common.Generator):
+    """
+    Note that the batch size of the module output could be less than the input
+    batch size. This is due the limitation of context extraction. Be sure to
+    provide the number of before and after contexts in addition to the intended
+    batch size.
+    """
     def __init__(self, prep_batches,
                  n_before=1, n_after=1, predict_self=False):
         self.n_before = n_before
@@ -107,10 +113,11 @@ class ContextDataGenerator(common.Generator):
 
             if n_bef or n_aft:
                 _offset = n_bef + n_aft + 1
+                subbatch_size = batch_size - n_bef - n_aft
                 out_data = [batch[i:i + _offset].unsqueeze(1)
-                            for i in range(batch_size)]
+                            for i in range(subbatch_size)]
                 out_lens = [lens[i:i + _offset].unsqueeze(1)
-                            for i in range(batch_size)]
+                            for i in range(subbatch_size)]
                 out_data = torch.cat(out_data, 1)
                 out_lens = torch.cat(out_lens, 1)
 

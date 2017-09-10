@@ -2,8 +2,8 @@ from .. import common
 
 
 class SplitWordIterator(common.Generator):
-    def __init__(self, sents, delimiter=None):
-        self.sents = sents
+    def __init__(self, sent, delimiter=None):
+        self.sent = sent
         self.delimiter = delimiter
 
     def _split(self, str):
@@ -13,6 +13,5 @@ class SplitWordIterator(common.Generator):
             return str.split(self.delimiter)
 
     def generate(self):
-        for sent in self.sents:
-            for w in self._split(sent):
-                yield w
+        for w in self._split(self.sent):
+            yield w
