@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-__VERSION__ = "0.1.6"
+__VERSION__ = "0.1.7"
 
 setup(
     name="pytorch-text-utils",

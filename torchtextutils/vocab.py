@@ -114,6 +114,12 @@ def populate_vocab(words, vocab, cutoff):
     return vocab
 
 
+def sent_words_iterator(sents):
+    for sent in sents:
+        for w in SplitWordIterator(sent):
+            yield w
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
@@ -127,7 +133,7 @@ def main():
     cutoff = args.cutoff
 
     reader = DirectoryReader(input_dir)
-    words = SplitWordIterator(reader)
+    words = sent_words_iterator(reader)
     vocab = Vocabulary(pad=pad, eos=eos, bos=bos, unk=unk)
 
     print("Populating vocabulary...")
