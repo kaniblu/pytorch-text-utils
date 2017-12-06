@@ -14,15 +14,10 @@ from .iterator import SplitWordIterator
 
 
 class Vocabulary(object):
-    def __init__(self, **reserved):
+    def __init__(self):
         self.words = []
         self.f2i = {}
         self.i2f = {}
-        self.reserved = reserved
-
-        for word, token in reserved.items():
-            self.add(token)
-            setattr(self, word, token)
 
     def add(self, w, ignore_duplicates=True):
         if w in self.f2i:
@@ -88,12 +83,10 @@ class Vocabulary(object):
 
 def create_parser():
     parser = argparse.ArgParser()
-    parser.add_argument("--data_dir", type=str, required=True)
-    parser.add_argument("--vocab_path", type=str, required=True)
-    parser.add_argument("--eos", type=str, default="<EOS>")
-    parser.add_argument("--bos", type=str, default="<BOS>")
-    parser.add_argument("--pad", type=str, default="<PAD>")
-    parser.add_argument("--unk", type=str, default="<UNK>")
+    parser.add_argument("--data-dir", action="append", type=argparse.path,
+                        required=True, help="")
+    parser.add_argument("--vocab-path", type=argparse.path, required=True)
+    parser.add_argument("--reserved", action="append", type=str)
     parser.add_argument("--cutoff", type=int, default=30000)
 
     return parser
@@ -120,24 +113,29 @@ def sent_words_iterator(sents):
             yield w
 
 
+def multiple_directory_reader(input_dirs):
+    for input_dir in input_dirs:
+        for sent in DirectoryReader(input_dir):
+            yield sent
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    input_dir = args.data_dir
+    input_dirs = args.data_dir
     output_path = args.vocab_path
-    eos = args.eos
-    bos = args.bos
-    pad = args.pad
-    unk = args.unk
+    reserved_words = args.reserved
     cutoff = args.cutoff
 
-    reader = DirectoryReader(input_dir)
+    reader = multiple_directory_reader(input_dirs)
     words = sent_words_iterator(reader)
-    vocab = Vocabulary(pad=pad, eos=eos, bos=bos, unk=unk)
+    vocab = Vocabulary()
 
     print("Populating vocabulary...")
     vocab = populate_vocab(words, vocab, cutoff)
+    for w in reserved_words:
+        vocab.add(w)
 
     parent_dir = os.path.dirname(output_path)
 
